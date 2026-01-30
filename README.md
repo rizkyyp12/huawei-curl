@@ -1,0 +1,1 @@
+# huawei-curl-auto-ava

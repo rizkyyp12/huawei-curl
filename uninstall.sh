@@ -9,7 +9,7 @@ BIN_DIR="/usr/bin"
 INIT_DIR="/etc/init.d"
 
 OC_SCRIPT="$BIN_DIR/oc-direct.sh"
-HUAWEI_SCRIPT="$BIN_DIR/huawei.py"
+HUAWEI_SCRIPT="$BIN_DIR/huawei_x.py"
 INIT_SCRIPT="$INIT_DIR/oc-direct"
 
 # --- ROOT CHECK ---

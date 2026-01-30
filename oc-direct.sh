@@ -9,8 +9,7 @@ INTERVAL=30
 FAST_INTERVAL=5
 MAX_FAIL=2
 
-HUAWEI_SCRIPT="/usr/bin/huawei_x.py"
-HUAWEI_ACTIVE="/tmp/huawei_active"
+COOLDOWN_AFTER_IP=6   # ⬅️ COOLDOWN 6 DETIK SETELAH GANTI IP
 
 YACD="http://127.0.0.1:9090"
 UA="Mozilla/5.0"
@@ -56,7 +55,7 @@ proxy_ready() {
 domain_invalid() {
     RES="$(curl -I -L \
         -A "$UA" \
-        --connect-timeout 5 \
+        --connect-timeout 10 \
         --max-time 8 \
         "https://$1" 2>/dev/null)"
 
@@ -68,7 +67,7 @@ domain_invalid() {
 any_domain_valid() {
     for d in $DOMAINS; do
         if ! domain_invalid "$d"; then
-            log "$d VALID"
+            log "$d VALID (trigger RULE)"
             return 0
         fi
         log "$d INVALID"
@@ -99,22 +98,19 @@ while true; do
         continue
     fi
 
-    # --- DOMAIN OK ---
+    # --- DOMAIN VALID ---
     if any_domain_valid; then
         FAIL=0
-        rm -f "$HUAWEI_ACTIVE"
-
         if [ "$STATE" != "RULE" ]; then
-            log "DOMAIN RECOVERED → RULE"
+            log "ONE DOMAIN VALID → instant RULE"
             set_mode rule
             set_state RULE
         fi
-
         sleep "$INTERVAL"
         continue
     fi
 
-    # --- DOMAIN FAIL ---
+    # --- ALL DOMAIN INVALID ---
     FAIL=$((FAIL + 1))
     log "ALL DOMAIN INVALID, FAIL COUNT = $FAIL"
 
@@ -123,17 +119,19 @@ while true; do
         set_state DIRECT
     fi
 
-    # --- HUAWEI RECOVERY LOOP ---
-    if [ "$FAIL" -ge "$MAX_FAIL" ] && [ "$STATE" != "RULE" ]; then
-        touch "$HUAWEI_ACTIVE"
-
-        if [ -f "$HUAWEI_SCRIPT" ]; then
-            log "RECOVERY ACTIVE → running huawei.py"
-            python3 "$HUAWEI_SCRIPT" >> "$LOG" 2>&1
-        else
-            log "ERROR: $HUAWEI_SCRIPT not found"
-        fi
+    if [ "$FAIL" -ge "$MAX_FAIL" ]; then
+        log "ALL INVALID $FAIL times → force DIRECT"
+        set_mode direct
     fi
+
+    # 🔥 ===== TRIGGER HUAWEI + COOLDOWN ===== 🔥
+    if [ $((FAIL % 1)) -eq 0 ]; then
+        log "[TRIGGER] FAIL $FAIL → RUN huawei.py"
+        python3 /usr/bin/huawei.py >> "$LOG" 2>&1
+        log "[COOLDOWN] wait ${COOLDOWN_AFTER_IP}s after IP change"
+        sleep "$COOLDOWN_AFTER_IP"
+    fi
+    # 🔥 =================================== 🔥
 
     sleep "$FAST_INTERVAL"
 done

@@ -5,7 +5,7 @@ echo " OpenClash Auto DIRECT + Huawei Recovery"
 echo " INSTALLER"
 echo "========================================"
 
-REPO_RAW="https://raw.githubusercontent.com/rizkyyp12/huawei-curl-auto-ava/main.py"
+REPO_RAW="https://raw.githubusercontent.com/rizkyyp12/huawei-curl/main.py"
 
 BIN_DIR="/usr/bin"
 INIT_DIR="/etc/init.d"

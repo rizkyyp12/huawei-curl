@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Script by https://bit.ly/aryochannel (modified for OpenClash)
+# (modified for OpenClash)
 
 from huawei_lte_api.Client import Client
 from huawei_lte_api.Connection import Connection

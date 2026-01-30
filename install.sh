@@ -5,13 +5,13 @@ echo " OpenClash Auto DIRECT + Huawei Recovery"
 echo " INSTALLER"
 echo "========================================"
 
-REPO_RAW="https://raw.githubusercontent.com/rizkyyp12/ip-hunter/main"
+REPO_RAW="https://raw.githubusercontent.com/rizkyyp12/huawei-curl-auto-ava/main"
 
 BIN_DIR="/usr/bin"
 INIT_DIR="/etc/init.d"
 
 OC_SCRIPT="$BIN_DIR/oc-direct.sh"
-HUAWEI_SCRIPT="$BIN_DIR/huawei.py"
+HUAWEI_SCRIPT="$BIN_DIR/huawei_x.py"
 INIT_SCRIPT="$INIT_DIR/oc-direct"
 
 # --- ROOT CHECK ---
@@ -27,8 +27,8 @@ wget -q -O "$OC_SCRIPT" "$REPO_RAW/oc-direct.sh" || {
 }
 
 echo "[2/6] Download huawei.py"
-wget -q -O "$HUAWEI_SCRIPT" "$REPO_RAW/huawei.py" || {
-    echo "[WARN] huawei.py not found (skip)"
+wget -q -O "$HUAWEI_SCRIPT" "$REPO_RAW/huawei_x.py" || {
+    echo "[WARN] huawei_x.py not found (skip)"
 }
 
 echo "[3/6] Set permissions"

@@ -2,11 +2,11 @@
 
 echo "========================================"
 echo " OpenClash Auto DIRECT + Huawei Recovery"
+echo " INSTALLER"
 echo "========================================"
 
 REPO_RAW="https://raw.githubusercontent.com/rizkyyp12/ip-hunter/main"
 
-# --- PATH ---
 BIN_DIR="/usr/bin"
 INIT_DIR="/etc/init.d"
 
@@ -14,15 +14,15 @@ OC_SCRIPT="$BIN_DIR/oc-direct.sh"
 HUAWEI_SCRIPT="$BIN_DIR/huawei.py"
 INIT_SCRIPT="$INIT_DIR/oc-direct"
 
-# --- CHECK ROOT ---
-[ "$(id -u)" != "0" ] && {
-    echo "[ERROR] Run as root"
+# --- ROOT CHECK ---
+if [ "$(id -u)" != "0" ]; then
+    echo "[ERROR] Please run as root"
     exit 1
-}
+fi
 
 echo "[1/6] Download oc-direct.sh"
 wget -q -O "$OC_SCRIPT" "$REPO_RAW/oc-direct.sh" || {
-    echo "[ERROR] Failed download oc-direct.sh"
+    echo "[ERROR] Failed to download oc-direct.sh"
     exit 1
 }
 
@@ -33,7 +33,7 @@ wget -q -O "$HUAWEI_SCRIPT" "$REPO_RAW/huawei.py" || {
 
 echo "[3/6] Set permissions"
 chmod +x "$OC_SCRIPT"
-chmod +x "$HUAWEI_SCRIPT" 2>/dev/null
+[ -f "$HUAWEI_SCRIPT" ] && chmod +x "$HUAWEI_SCRIPT"
 
 echo "[4/6] Create init.d service"
 cat > "$INIT_SCRIPT" <<'EOF'
@@ -54,12 +54,13 @@ EOF
 
 chmod +x "$INIT_SCRIPT"
 
-echo "[5/6] Enable autostart"
-"$INIT_SCRIPT" enable
+echo "[5/6] Enable & start service"
+/etc/init.d/oc-direct enable
+/etc/init.d/oc-direct start
 
-echo "[6/6] Done"
-echo "========================================"
-echo " Installed successfully"
-echo " Log file : /tmp/oc.log"
-echo " Service  : /etc/init.d/oc-direct"
-echo "========================================"
+echo "[6/6] DONE"
+echo "----------------------------------------"
+echo " Service : /etc/init.d/oc-direct"
+echo " Log     : /tmp/oc.log"
+echo " Status  : RUNNING"
+echo "----------------------------------------"

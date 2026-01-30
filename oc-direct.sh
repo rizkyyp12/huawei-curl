@@ -7,7 +7,7 @@ LOG="/tmp/oc.log"
 
 INTERVAL=30
 FAST_INTERVAL=5
-MAX_FAIL=2
+MAX_FAIL=2        # tetap untuk force direct, optional
 
 COOLDOWN_AFTER_IP=6   # ⬅️ COOLDOWN 6 DETIK SETELAH GANTI IP
 
@@ -64,19 +64,12 @@ domain_invalid() {
     return 1
 }
 
-any_domain_valid() {
-    for d in $DOMAINS; do
-        if ! domain_invalid "$d"; then
-            log "$d VALID (trigger RULE)"
-            return 0
-        fi
-        log "$d INVALID"
-    done
-    return 1
-}
-
 # ================= FSM =================
-FAIL=0
+# inisialisasi fail count per domain
+declare -A FAIL_COUNT
+for d in $DOMAINS; do
+    FAIL_COUNT["$d"]=0
+done
 
 while true; do
     STATE="$(get_state)"
@@ -98,11 +91,25 @@ while true; do
         continue
     fi
 
-    # --- DOMAIN VALID ---
-    if any_domain_valid; then
-        FAIL=0
+    # --- DOMAIN CHECK ---
+    ALL_VALID=true
+    for d in $DOMAINS; do
+        if domain_invalid "$d"; then
+            FAIL_COUNT["$d"]=$((FAIL_COUNT["$d"] + 1))
+            log "$d INVALID (${FAIL_COUNT["$d"]}/5)"
+            ALL_VALID=false
+        else
+            if [ "${FAIL_COUNT["$d"]}" -ne 0 ]; then
+                log "$d VALID → reset FAIL"
+                FAIL_COUNT["$d"]=0
+            fi
+        fi
+    done
+
+    # --- ALL DOMAIN VALID ---
+    if $ALL_VALID; then
         if [ "$STATE" != "RULE" ]; then
-            log "ONE DOMAIN VALID → instant RULE"
+            log "ALL DOMAIN VALID → switch RULE"
             set_mode rule
             set_state RULE
         fi
@@ -110,28 +117,28 @@ while true; do
         continue
     fi
 
-    # --- ALL DOMAIN INVALID ---
-    FAIL=$((FAIL + 1))
-    log "ALL DOMAIN INVALID, FAIL COUNT = $FAIL"
+    # --- CHECK IF ALL DOMAINS FAIL >= 5 ---
+    TRIGGER_HUAWEI=true
+    for d in $DOMAINS; do
+        if [ "${FAIL_COUNT["$d"]}" -lt 5 ]; then
+            TRIGGER_HUAWEI=false
+        fi
+    done
 
-    if [ "$STATE" != "DIRECT" ]; then
-        set_mode direct
-        set_state DIRECT
-    fi
-
-    if [ "$FAIL" -ge "$MAX_FAIL" ]; then
-        log "ALL INVALID $FAIL times → force DIRECT"
-        set_mode direct
-    fi
-
-    # 🔥 ===== TRIGGER HUAWEI + COOLDOWN ===== 🔥
-    if [ $((FAIL % 1)) -eq 0 ]; then
-        log "[TRIGGER] FAIL $FAIL → RUN huawei.py"
+    if $TRIGGER_HUAWEI; then
+        log "ALL DOMAINS FAILED >=5 → switch DIRECT + trigger huawei.py"
+        if [ "$STATE" != "DIRECT" ]; then
+            set_mode direct
+            set_state DIRECT
+        fi
         python3 /usr/bin/huawei.py >> "$LOG" 2>&1
         log "[COOLDOWN] wait ${COOLDOWN_AFTER_IP}s after IP change"
         sleep "$COOLDOWN_AFTER_IP"
+        # reset per-domain FAIL setelah trigger
+        for d in $DOMAINS; do
+            FAIL_COUNT["$d"]=0
+        done
     fi
-    # 🔥 =================================== 🔥
 
     sleep "$FAST_INTERVAL"
 done

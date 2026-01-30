@@ -1,4 +1,4 @@
-# huawei-curl-auto-ava
+# huawei-curl
 
 # installasi 
 ```

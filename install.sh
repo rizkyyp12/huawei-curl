@@ -63,9 +63,9 @@ cat << 'EOF' > "$HUAWEI_CONFIG"
 config huawei 'main'
     option router_ip '192.168.8.1'
     option username 'admin'
-    option password 'admin'
-    # option telegram_token 'BOT_TOKEN'
-    # option chat_id 'CHAT_ID'
+    option password 'admin123'
+    # option telegram_token '8381432929:AAHBBSLIZVUO1fbkjxuh8eyblSBKL1juXEo'
+    # option chat_id '7848244096'
 EOF
     echo "  -> Config created"
 else

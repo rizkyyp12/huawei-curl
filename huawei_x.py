@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# Huawei LTE – PLMN Trigger Version (Identik Script Lama)
-# OpenWrt Safe + Telegram Internet-Aware
+# Huawei LTE – PLMN Trigger (Stable Telegram Version)
+# OpenWrt Safe + OpenClash Friendly
 
 import time
 import socket
@@ -27,64 +27,68 @@ def success(msg):
     print("\033[92m" + msg + "\033[0m")
 
 # ===============================
-# INTERNET CHECK (HTTP)
+# INTERNET CHECK (TELEGRAM-AWARE)
 # ===============================
 
 def internet_available(timeout=5):
-    urls = [
-        "https://www.google.com/generate_204",
-        "https://www.gstatic.com/generate_204",
-        "https://www.cloudflare.com/cdn-cgi/trace"
-    ]
-    for url in urls:
-        try:
-            r = requests.get(url, timeout=timeout)
-            if r.status_code in (200, 204):
-                return True
-        except Exception:
-            pass
-    return False
+    try:
+        r = requests.get(
+            "https://api.telegram.org",
+            timeout=timeout
+        )
+        return r.status_code in (200, 401)
+    except Exception:
+        return False
 
-def wait_for_internet(max_wait=30):
+def wait_for_internet(max_wait=60):
     start = time.time()
     while time.time() - start < max_wait:
         if internet_available():
             return True
-        time.sleep(2)
+        time.sleep(3)
     return False
 
 # ===============================
-# TELEGRAM (SAFE)
+# TELEGRAM (STABLE)
 # ===============================
 
 def send_telegram(token, chat_id, message, thread_id=None):
     if not token or not chat_id:
+        warn("Token atau Chat ID kosong, Telegram dilewati.")
         return
 
+    info("Menunggu koneksi internet untuk Telegram...")
     if not wait_for_internet():
-        warn("Internet belum tersedia, Telegram dibatalkan.")
+        warn("Internet tidak tersedia, Telegram dibatalkan.")
         return
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    data = {"chat_id": chat_id, "text": message}
+    data = {
+        "chat_id": chat_id,
+        "text": message,
+        "disable_web_page_preview": True
+    }
 
     if thread_id:
-        data["message_thread_id"] = thread_id
+        data["message_thread_id"] = int(thread_id)
 
     try:
-        requests.post(url, data=data, timeout=10)
-        success("Telegram terkirim.")
+        r = requests.post(url, data=data, timeout=10)
+        if r.status_code == 200:
+            success("Telegram terkirim.")
+        else:
+            warn(f"Telegram gagal, HTTP {r.status_code}")
     except Exception as e:
-        warn(f"Gagal kirim Telegram: {e}")
+        warn(f"Telegram error: {e}")
 
 # ===============================
-# OPENWRT CONFIG (FAIL-SAFE)
+# OPENWRT CONFIG
 # ===============================
 
 def load_config(path="/etc/config/huawei"):
     cfg = {}
     if not os.path.exists(path):
-        warn(f"Config {path} tidak ada, pakai default.")
+        warn(f"Config {path} tidak ditemukan, pakai default.")
         return cfg
 
     with open(path, "r") as f:
@@ -100,13 +104,13 @@ def load_config(path="/etc/config/huawei"):
 # ===============================
 
 def get_wan_info(client):
-    info = client.device.information()
+    info_dev = client.device.information()
     wan_ip = (
-        info.get("WanIPAddress")
-        or info.get("IPAddress")
-        or info.get("CurrentIPAddress")
+        info_dev.get("WanIPAddress")
+        or info_dev.get("IPAddress")
+        or info_dev.get("CurrentIPAddress")
     )
-    device = info.get("DeviceName", "Huawei LTE")
+    device = info_dev.get("DeviceName", "Huawei LTE")
     return wan_ip, device
 
 def fetch_wan_info(client, timeout=30):
@@ -132,10 +136,10 @@ def main():
     cfg = load_config()
 
     router_ip = cfg.get("router_ip", "192.168.8.1")
-    username = cfg.get("username", "admin")
-    password = cfg.get("password", "admin")
-    tg_token = cfg.get("telegram_token", "")
-    chat_id = cfg.get("chat_id", "")
+    username  = cfg.get("username", "admin")
+    password  = cfg.get("password", "admin")
+    tg_token  = cfg.get("telegram_token", "")
+    chat_id   = cfg.get("chat_id", "")
     thread_id = cfg.get("message_thread_id")
 
     hostname = socket.gethostname()
@@ -150,7 +154,7 @@ def main():
             info(f"Old IP : {old_ip}")
 
             initiate_ip_change(client)
-            time.sleep(5)
+            time.sleep(8)
 
             new_ip, _ = fetch_wan_info(client)
             info(f"New IP : {new_ip}")
@@ -165,7 +169,7 @@ def main():
             )
 
             send_telegram(tg_token, chat_id, msg, thread_id)
-            success("Selesai.")
+            success("Proses selesai.")
 
     except Exception as e:
         err = f"Huawei script error: {e}"

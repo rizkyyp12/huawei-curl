@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-# Huawei LTE – PLMN Trigger (Stable Telegram Version)
-# OpenWrt Safe + OpenClash Friendly
+# Huawei LTE – PLMN Trigger
+# Telegram sent AFTER IP change AND internet recovered
+# OpenWrt + OpenClash SAFE
 
 import time
 import socket
@@ -40,16 +41,25 @@ def internet_available(timeout=5):
     except Exception:
         return False
 
-def wait_for_internet(max_wait=60):
+def wait_for_internet(max_wait=180, interval=5):
+    info(f"Menunggu koneksi internet hingga {max_wait} detik...")
     start = time.time()
+
+    # Delay awal agar routing & OpenClash settle
+    time.sleep(15)
+
     while time.time() - start < max_wait:
         if internet_available():
+            success("Internet sudah pulih.")
             return True
-        time.sleep(3)
+        info("Internet belum siap, retry...")
+        time.sleep(interval)
+
+    warn("Timeout menunggu internet.")
     return False
 
 # ===============================
-# TELEGRAM (STABLE)
+# TELEGRAM
 # ===============================
 
 def send_telegram(token, chat_id, message, thread_id=None):
@@ -57,9 +67,8 @@ def send_telegram(token, chat_id, message, thread_id=None):
         warn("Token atau Chat ID kosong, Telegram dilewati.")
         return
 
-    info("Menunggu koneksi internet untuk Telegram...")
     if not wait_for_internet():
-        warn("Internet tidak tersedia, Telegram dibatalkan.")
+        warn("Internet belum pulih, Telegram dibatalkan.")
         return
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -82,25 +91,27 @@ def send_telegram(token, chat_id, message, thread_id=None):
         warn(f"Telegram error: {e}")
 
 # ===============================
-# OPENWRT CONFIG
+# OPENWRT CONFIG (UCI-NATIVE)
 # ===============================
 
-def load_config(path="/etc/config/huawei"):
+def load_config():
     cfg = {}
-    if not os.path.exists(path):
-        warn(f"Config {path} tidak ditemukan, pakai default.")
-        return cfg
-
-    with open(path, "r") as f:
-        for line in f:
-            m = re.match(r"\s*option\s+(\w+)\s+'([^']+)'", line)
-            if m:
-                k, v = m.groups()
-                cfg[k] = v
+    try:
+        import subprocess
+        out = subprocess.check_output(
+            ["uci", "show", "huawei.main"],
+            text=True
+        )
+        for line in out.splitlines():
+            if "=" in line:
+                k, v = line.split("=", 1)
+                cfg[k.split(".")[-1]] = v.strip("'")
+    except Exception as e:
+        warn(f"Gagal load config UCI: {e}")
     return cfg
 
 # ===============================
-# HUAWEI LTE CORE (SCRIPT LAMA)
+# HUAWEI LTE CORE
 # ===============================
 
 def get_wan_info(client):
@@ -123,7 +134,7 @@ def fetch_wan_info(client, timeout=30):
             raise Exception("Timeout mendapatkan WAN IP")
         time.sleep(1)
 
-# 🔥 MEKANISME IDENTIK SCRIPT LAMA
+# 🔥 IDENTIK SCRIPT LAMA
 def initiate_ip_change(client):
     info("Trigger PLMN refresh...")
     client.net.plmn_list()
@@ -159,13 +170,18 @@ def main():
             new_ip, _ = fetch_wan_info(client)
             info(f"New IP : {new_ip}")
 
+            # ✅ HANYA lanjut jika IP benar-benar berubah
+            if new_ip == old_ip:
+                warn("IP tidak berubah, Telegram dilewati.")
+                return
+
             msg = (
                 f"⚙️ Change IP - {hostname}\n"
                 f"====================\n"
                 f"🔰 Modem : {modem}\n"
                 f"🔰 Old IP: {old_ip}\n"
                 f"🔰 New IP: {new_ip}\n\n"
-                f"✅ PLMN refresh success"
+                f"✅ Internet recovered & ready"
             )
 
             send_telegram(tg_token, chat_id, msg, thread_id)
